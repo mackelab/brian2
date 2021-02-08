@@ -1,4 +1,4 @@
-'''
+"""
 Module defining the `Network` object, the basis of all simulation runs.
 
 Preferences
@@ -6,7 +6,7 @@ Preferences
 
 .. document_brian_prefs:: core.network
 
-'''
+"""
 
 import os
 import sys
@@ -28,31 +28,34 @@ from brian2.core.preferences import prefs, BrianPreference
 from brian2.core.namespace import get_local_namespace
 from .base import device_override
 
-__all__ = ['Network', 'profiling_summary', 'scheduling_summary']
+__all__ = ["Network", "profiling_summary", "scheduling_summary"]
 
 
 logger = get_logger(__name__)
 
 
-prefs.register_preferences('core.network', 'Network preferences',
-                           default_schedule=BrianPreference(
-                               default=['start',
-                                        'groups',
-                                        'thresholds',
-                                        'synapses',
-                                        'resets',
-                                        'end',
-                                        ],
-                               docs='''
+prefs.register_preferences(
+    "core.network",
+    "Network preferences",
+    default_schedule=BrianPreference(
+        default=[
+            "start",
+            "groups",
+            "thresholds",
+            "synapses",
+            "resets",
+            "end",
+        ],
+        docs="""
                                Default schedule used for networks that
                                don't specify a schedule.
-                               '''
-                           )
-                           )
+                               """,
+    ),
+)
 
 
 def _format_time(time_in_s):
-    '''
+    """
     Helper function to format time in seconds, minutes, hours, days, depending
     on the magnitude.
 
@@ -68,53 +71,58 @@ def _format_time(time_in_s):
     >>> _format_time(.5)
     '< 1s'
 
-    '''
-    divisors = [24*60*60, 60*60, 60, 1]
-    letters = ['d', 'h', 'm', 's']
+    """
+    divisors = [24 * 60 * 60, 60 * 60, 60, 1]
+    letters = ["d", "h", "m", "s"]
     remaining = time_in_s
-    text = ''
+    text = ""
     for divisor, letter in zip(divisors, letters):
         time_to_represent = int(remaining / divisor)
         remaining -= time_to_represent * divisor
         if time_to_represent > 0 or len(text):
             if len(text):
-                text += ' '
-            text += '%d%s' % (time_to_represent, letter)
+                text += " "
+            text += "%d%s" % (time_to_represent, letter)
 
     # less than one second
     if len(text) == 0:
-        text = '< 1s'
+        text = "< 1s"
 
     return text
 
 
 class TextReport(object):
-    '''
+    """
     Helper object to report simulation progress in `Network.run`.
 
     Parameters
     ----------
     stream : file
         The stream to write to, commonly `sys.stdout` or `sys.stderr`.
-    '''
+    """
+
     def __init__(self, stream):
         self.stream = stream
 
     def __call__(self, elapsed, completed, start, duration):
         if completed == 0.0:
-            self.stream.write(('Starting simulation at t=%s for a duration of '
-                               '%s\n') % (start, duration))
+            self.stream.write(
+                ("Starting simulation at t=%s for a duration of " "%s\n")
+                % (start, duration)
+            )
         else:
-            report_msg = ('{t} ({percent}%) simulated in '
-                          '{real_t}').format(t=str(completed*duration),
-                                             percent=int(completed*100.),
-                                             real_t=_format_time(float(elapsed)))
+            report_msg = ("{t} ({percent}%) simulated in " "{real_t}").format(
+                t=str(completed * duration),
+                percent=int(completed * 100.0),
+                real_t=_format_time(float(elapsed)),
+            )
             if completed < 1.0:
-                remaining = int(round((1-completed)/completed*float(elapsed)))
-                remaining_msg = (', estimated {remaining} '
-                                 'remaining.\n').format(remaining=_format_time(remaining))
+                remaining = int(round((1 - completed) / completed * float(elapsed)))
+                remaining_msg = (", estimated {remaining} " "remaining.\n").format(
+                    remaining=_format_time(remaining)
+                )
             else:
-                remaining_msg = '\n'
+                remaining_msg = "\n"
 
             self.stream.write(report_msg + remaining_msg)
 
@@ -124,56 +132,82 @@ class TextReport(object):
 
 def _format_table(header, values, cell_formats):
     # table = [header] + values
-    table_format = len(values)*[cell_formats]
-    col_widths = [max(len(format.format(cell, 0))
-                      for format, cell in zip(col_format, col))
-                  for col_format, col in zip(list(zip(*([len(header)*['{}']] + table_format))),
-                                             list(zip(*([header] + values))))]
-    line = '-+-'.join('-'*width for width in col_widths)
-    content = [' | '.join(format.format(cell, width)
-                          for format, cell, width in zip(row_format, row, col_widths))
-               for row_format, row in zip(table_format, values)]
-    formatted_header = ' | '.join('{:^{}}'.format(h, width) for h, width in zip(header, col_widths))
+    table_format = len(values) * [cell_formats]
+    col_widths = [
+        max(len(format.format(cell, 0)) for format, cell in zip(col_format, col))
+        for col_format, col in zip(
+            list(zip(*([len(header) * ["{}"]] + table_format))),
+            list(zip(*([header] + values))),
+        )
+    ]
+    line = "-+-".join("-" * width for width in col_widths)
+    content = [
+        " | ".join(
+            format.format(cell, width)
+            for format, cell, width in zip(row_format, row, col_widths)
+        )
+        for row_format, row in zip(table_format, values)
+    ]
+    formatted_header = " | ".join(
+        "{:^{}}".format(h, width) for h, width in zip(header, col_widths)
+    )
 
-    return '\n'.join([formatted_header, line] + content)
+    return "\n".join([formatted_header, line] + content)
 
 
 class SchedulingSummary(object):
-    '''
+    """
     Object representing the schedule that is used to simulate the objects in a
     network. Objects of this type are returned by `scheduling_summary`, they
     should not be created manually by the user.
-    
+
     Parameters
     ----------
     objects : list of `BrianObject`
         The sorted list of objects that are simulated by the network.
-    '''
+    """
+
     def __init__(self, objects):
         # Map each dt to a rank (i.e. smallest dt=0, second smallest=1, etc.)
-        self.dts = dict((dt, rank) for rank, dt in
-                        enumerate(sorted({float(obj.clock.dt)
-                                          for obj in objects})))
-        ScheduleEntry = namedtuple('ScheduleEntry',
-                                   field_names=['when', 'order', 'dt',
-                                                'name', 'type', 'active',
-                                                'owner_name', 'owner_type'])
+        self.dts = dict(
+            (dt, rank)
+            for rank, dt in enumerate(sorted({float(obj.clock.dt) for obj in objects}))
+        )
+        ScheduleEntry = namedtuple(
+            "ScheduleEntry",
+            field_names=[
+                "when",
+                "order",
+                "dt",
+                "name",
+                "type",
+                "active",
+                "owner_name",
+                "owner_type",
+            ],
+        )
         entries = []
         for obj in objects:
             if len(obj.contained_objects):
                 continue
-            owner = getattr(obj, 'group', None)
+            owner = getattr(obj, "group", None)
             if owner is None:
                 owner_name, owner_type = None, None
             else:
                 owner_name = owner.name
                 owner_type = owner.__class__.__name__
-            entries.append(ScheduleEntry(when=obj.when, order=obj.order,
-                                         dt=obj.clock.dt, name=obj.name,
-                                         type=obj.__class__.__name__,
-                                         active=obj.active,
-                                         owner_name=owner_name,
-                                         owner_type=owner_type))
+            entries.append(
+                ScheduleEntry(
+                    when=obj.when,
+                    order=obj.order,
+                    dt=obj.clock.dt,
+                    name=obj.name,
+                    type=obj.__class__.__name__,
+                    active=obj.active,
+                    owner_name=owner_name,
+                    owner_type=owner_type,
+                )
+            )
         self.entries = entries
 
         self.all_dts = sorted({float(entry.dt) for entry in self.entries})
@@ -181,20 +215,32 @@ class SchedulingSummary(object):
         self.steps = {float(dt): int(dt / self.all_dts[0]) for dt in self.all_dts}
 
     def __repr__(self):
-        return _format_table(['object', 'part of', 'Clock dt', 'when', 'order', 'active'],
-                             [['{} ({})'.format(entry.name, entry.type),
-                               '{} ({})'.format(entry.owner_name, entry.owner_type)
-                               if entry.owner_name is not None else '--',
-                               '{} (every {})'.format(str(entry.dt),
-                                                     'step' if self.steps[float(entry.dt)] == 1
-                                                     else '{} steps'.format(self.steps[float(entry.dt)])),
-                               entry.when,
-                               entry.order,
-                               'yes' if entry.active else 'no'] for entry in self.entries],
-                             ['{:<{}}', '{:<{}}', '{:<{}}', '{:<{}}', '{:{}d}', '{:^{}}'])
+        return _format_table(
+            ["object", "part of", "Clock dt", "when", "order", "active"],
+            [
+                [
+                    "{} ({})".format(entry.name, entry.type),
+                    "{} ({})".format(entry.owner_name, entry.owner_type)
+                    if entry.owner_name is not None
+                    else "--",
+                    "{} (every {})".format(
+                        str(entry.dt),
+                        "step"
+                        if self.steps[float(entry.dt)] == 1
+                        else "{} steps".format(self.steps[float(entry.dt)]),
+                    ),
+                    entry.when,
+                    entry.order,
+                    "yes" if entry.active else "no",
+                ]
+                for entry in self.entries
+            ],
+            ["{:<{}}", "{:<{}}", "{:<{}}", "{:<{}}", "{:{}d}", "{:^{}}"],
+        )
 
     def _repr_html_(self):
-        rows = ['''\
+        rows = [
+            """\
         <tr>
             <td style="text-align: left;">{}</td>
             <td style="text-align: left;">{}</td>
@@ -203,17 +249,24 @@ class SchedulingSummary(object):
             <td style="text-align: right;">{}</td>
             <td style="text-align: center;">{}</td>
         </tr>
-        '''.format('<b>{}</b> (<em>{}</em>)'.format(entry.name, entry.type),
-                   '{} (<em>{}</em>)'.format(entry.owner_name, entry.owner_type)
-                   if entry.owner_name is not None else '&ndash;',
-                   '{} (every {})'.format(str(entry.dt),
-                                          'step' if self.steps[float(entry.dt)] == 1
-                                          else '{} steps'.format(self.steps[float(entry.dt)])),
-                   entry.when,
-                   entry.order,
-                   'yes' if entry.active else 'no')
-                for entry in self.entries]
-        html_code = '''
+        """.format(
+                "<b>{}</b> (<em>{}</em>)".format(entry.name, entry.type),
+                "{} (<em>{}</em>)".format(entry.owner_name, entry.owner_type)
+                if entry.owner_name is not None
+                else "&ndash;",
+                "{} (every {})".format(
+                    str(entry.dt),
+                    "step"
+                    if self.steps[float(entry.dt)] == 1
+                    else "{} steps".format(self.steps[float(entry.dt)]),
+                ),
+                entry.when,
+                entry.order,
+                "yes" if entry.active else "no",
+            )
+            for entry in self.entries
+        ]
+        html_code = """
         <table>
         <thead>
         <tr>
@@ -229,12 +282,14 @@ class SchedulingSummary(object):
 {rows}
         </tbody>
         </table>
-        '''.format(rows='\n'.join(rows))
+        """.format(
+            rows="\n".join(rows)
+        )
         return html_code
 
 
 def _check_multiple_summed_updaters(objects):
-    '''
+    """
     Helper function that checks whether multiple `SummedVariableUpdater` target
     the same target variable. Raises a `NotImplementedError` if this is the
     case (and problematic, i.e. not when using non-overlapping subgroups).
@@ -243,7 +298,7 @@ def _check_multiple_summed_updaters(objects):
     ----------
     objects : list of `BrianObject`
         The list of objects in the network.
-    '''
+    """
     summed_targets = {}
     for obj in objects:
         if isinstance(obj, SummedVariableUpdater):
@@ -253,22 +308,31 @@ def _check_multiple_summed_updaters(objects):
                     # We raise an error, even though this could be ok in
                     # principle (e.g. two Synapses could target different
                     # subsets of the target groups, without using subgroups)
-                    msg = ('Multiple "summed variables" target the '
-                           'variable "{var}" in group "{target}". Use '
-                           'multiple variables in the target group '
-                           'instead.'.format(var=obj.target_var.name,
-                                             target=obj.target.name))
+                    msg = (
+                        'Multiple "summed variables" target the '
+                        'variable "{var}" in group "{target}". Use '
+                        "multiple variables in the target group "
+                        "instead.".format(
+                            var=obj.target_var.name, target=obj.target.name
+                        )
+                    )
                     raise NotImplementedError(msg)
-                elif (obj.target.start < other_target.stop and
-                              other_target.start < obj.target.stop):
+                elif (
+                    obj.target.start < other_target.stop
+                    and other_target.start < obj.target.stop
+                ):
                     # Overlapping subgroups
-                    msg = ('Multiple "summed variables" target the '
-                           'variable "{var}" in overlapping groups '
-                           '"{target1}" and "{target2}". Use separate '
-                           'variables in the target groups '
-                           'instead.'.format(var=obj.target_var.name,
-                                             target1=other_target.name,
-                                             target2=obj.target.name))
+                    msg = (
+                        'Multiple "summed variables" target the '
+                        'variable "{var}" in overlapping groups '
+                        '"{target1}" and "{target2}". Use separate '
+                        "variables in the target groups "
+                        "instead.".format(
+                            var=obj.target_var.name,
+                            target1=other_target.name,
+                            target2=obj.target.name,
+                        )
+                    )
                     raise NotImplementedError(msg)
             summed_targets[obj.target_var] = obj.target
 
@@ -296,9 +360,9 @@ def _get_all_objects(objs):
 
 
 class Network(Nameable):
-    '''
+    """
     Network(*objs, name='network*')
-    
+
     The main simulation controller in Brian
 
     `Network` handles the running of a simulation. It contains a set of Brian
@@ -307,7 +371,7 @@ class Network(Nameable):
     objects get called in what order is described in detail in the notes below.
     The objects in the `Network` are accesible via their names, e.g.
     `net['neurongroup']` would return the `NeuronGroup` with this name.
-    
+
     Parameters
     ----------
     objs : (`BrianObject`, container), optional
@@ -318,9 +382,9 @@ class Network(Nameable):
 
     Notes
     -----
-    
+
     The main run loop performs the following steps:
-    
+
     1. Prepare the objects if necessary, see `~Network.prepare`.
     2. Determine the end time of the simulation as `~Network.t`+``duration``.
     3. Determine which set of clocks to update. This will be the clock with the
@@ -336,8 +400,8 @@ class Network(Nameable):
        not be called if the `~BrianObject.active` flag is set to ``False``.
        The order in which the objects are called is described below.
     6. Increase `Clock.t` by `Clock.dt` for each of the clocks and return to
-       step 2. 
-    
+       step 2.
+
     The order in which the objects are updated in step 4 is determined by
     the `Network.schedule` and the objects `~BrianObject.when` and
     `~BrianObject.order` attributes. The `~Network.schedule` is a list of
@@ -352,12 +416,12 @@ class Network(Nameable):
     ``when=='before_groups'``, ``when=='groups'`` and so forth. If several
     objects have the same `~BrianObject.when` attribute, then the order is
     determined by the `~BrianObject.order` attribute (lower first).
-    
+
     See Also
     --------
-    
+
     MagicNetwork, run, stop
-    '''
+    """
 
     def __init__(self, *objs, **kwds):
         #: The set of objects in the Network, should not normally be modified
@@ -366,8 +430,8 @@ class Network(Nameable):
         #: objects during a run: it is filled in `before_run` and emptied in
         #: `after_run`
         self.objects = set()
-        
-        name = kwds.pop('name', 'network*')
+
+        name = kwds.pop("name", "network*")
 
         if kwds:
             raise TypeError("Only keyword argument to Network is 'name'.")
@@ -387,27 +451,29 @@ class Network(Nameable):
         self._profiling_info = None
 
         self._schedule = None
-     
-    t = property(fget=lambda self: Quantity(self.t_, dim=second.dim, copy=False),
-                 doc='''
-                     Current simulation time in seconds (`Quantity`)
-                     ''')
 
-    @device_override('network_get_profiling_info')
+    t = property(
+        fget=lambda self: Quantity(self.t_, dim=second.dim, copy=False),
+        doc="""
+                     Current simulation time in seconds (`Quantity`)
+                     """,
+    )
+
+    @device_override("network_get_profiling_info")
     def get_profiling_info(self):
-        '''
+        """
         The only reason this is not directly implemented in `profiling_info`
         is to allow devices (e.g. `CPPStandaloneDevice`) to overwrite this.
-        '''
+        """
         if self._profiling_info is None:
-            raise ValueError('No profiling info collected (did you run with '
-                             'profile=True?)')
-        return sorted(self._profiling_info, key=lambda item: item[1],
-                      reverse=True)
+            raise ValueError(
+                "No profiling info collected (did you run with " "profile=True?)"
+            )
+        return sorted(self._profiling_info, key=lambda item: item[1], reverse=True)
 
     @property
     def profiling_info(self):
-        '''
+        """
         The time spent in executing the various `CodeObject` s.
 
         A list of ``(name, time)`` tuples, containing the name of the
@@ -417,15 +483,18 @@ class Network(Nameable):
 
         Profiling has to be activated using the ``profile`` keyword in `run` or
         `Network.run`.
-        '''
+        """
         return self.get_profiling_info()
 
     _globally_stopped = False
 
     def __getitem__(self, item):
         if not isinstance(item, str):
-            raise TypeError(('Need a name to access objects in a Network, '
-                             'got {type} instead').format(type=type(item)))
+            raise TypeError(
+                (
+                    "Need a name to access objects in a Network, " "got {type} instead"
+                ).format(type=type(item))
+            )
         for obj in self.objects:
             if obj.name == item:
                 return obj
@@ -434,8 +503,11 @@ class Network(Nameable):
 
     def __delitem__(self, key):
         if not isinstance(key, str):
-            raise TypeError(('Need a name to access objects in a Network, '
-                             'got {type} instead').format(type=type(key)))
+            raise TypeError(
+                (
+                    "Need a name to access objects in a Network, " "got {type} instead"
+                ).format(type=type(key))
+            )
         for obj in self.objects:
             if obj.name == key:
                 self.remove(obj)
@@ -458,10 +530,10 @@ class Network(Nameable):
     def add(self, *objs):
         """
         Add objects to the `Network`
-        
+
         Parameters
         ----------
-        
+
         objs : (`BrianObject`, container)
             The `BrianObject` or container of Brian objects to be added. Specify
             multiple objects, or lists (or other containers) of objects.
@@ -472,12 +544,13 @@ class Network(Nameable):
         for obj in objs:
             if isinstance(obj, BrianObject):
                 if obj._network is not None:
-                    raise RuntimeError('%s has already been simulated, cannot '
-                                       'add it to the network. If you were '
-                                       'trying to remove and add an object to '
-                                       'temporarily stop it from being run, '
-                                       'set its active flag to False instead.'
-                                       % obj.name)
+                    raise RuntimeError(
+                        "%s has already been simulated, cannot "
+                        "add it to the network. If you were "
+                        "trying to remove and add an object to "
+                        "temporarily stop it from being run, "
+                        "set its active flag to False instead." % obj.name
+                    )
                 self.objects.add(obj)
             else:
                 # allow adding values from dictionaries
@@ -493,21 +566,23 @@ class Network(Nameable):
                                 raise TypeError()
                             self.add(o)
                     except TypeError:
-                        raise TypeError("Can only add objects of type BrianObject, "
-                                        "or containers of such objects to Network")
+                        raise TypeError(
+                            "Can only add objects of type BrianObject, "
+                            "or containers of such objects to Network"
+                        )
 
     def remove(self, *objs):
-        '''
+        """
         Remove an object or sequence of objects from a `Network`.
-        
+
         Parameters
         ----------
-        
+
         objs : (`BrianObject`, container)
             The `BrianObject` or container of Brian objects to be removed. Specify
             multiple objects, or lists (or other containers) of objects.
             Containers will be removed recursively.
-        '''
+        """
         for obj in objs:
             if isinstance(obj, BrianObject):
                 self.objects.remove(obj)
@@ -516,27 +591,29 @@ class Network(Nameable):
                     for o in obj:
                         self.remove(o)
                 except TypeError:
-                    raise TypeError("Can only remove objects of type "
-                                    "BrianObject, or containers of such "
-                                    "objects from Network")
+                    raise TypeError(
+                        "Can only remove objects of type "
+                        "BrianObject, or containers of such "
+                        "objects from Network"
+                    )
 
     def _full_state(self):
         all_objects = _get_all_objects(self.objects)
         state = {}
         for obj in all_objects:
-            if hasattr(obj, '_full_state'):
+            if hasattr(obj, "_full_state"):
                 state[obj.name] = obj._full_state()
         clocks = {obj.clock for obj in all_objects}
         for clock in clocks:
             state[clock.name] = clock._full_state()
         # Store the time as "0_t" -- this name is guaranteed not to clash with
         # the name of an object as names are not allowed to start with a digit
-        state['0_t'] = self.t_
+        state["0_t"] = self.t_
         return state
 
-    @device_override('network_store')
-    def store(self, name='default', filename=None):
-        '''
+    @device_override("network_store")
+    def store(self, name="default", filename=None):
+        """
         store(name='default', filename=None)
 
         Store the state of the network and all included objects.
@@ -560,7 +637,7 @@ class Network(Nameable):
         format of the file is not guaranteed to work across platforms or
         versions. If you are interested in storing the state of a network for
         documentation or analysis purposes use `Network.get_states` instead.
-        '''
+        """
         clocks = {obj.clock for obj in _get_all_objects(self.objects)}
         # Make sure that all clocks are up to date
         for clock in clocks:
@@ -569,7 +646,7 @@ class Network(Nameable):
         state = self._full_state()
         # Store the state of the random number generator
         dev = get_device()
-        state['_random_generator_state'] = dev.get_random_state()
+        state["_random_generator_state"] = dev.get_random_state()
 
         if filename is None:
             self._stored_state[name] = state
@@ -577,19 +654,18 @@ class Network(Nameable):
             # A single file can contain several states, so we'll read in the
             # existing file first if it exists
             if os.path.exists(filename):
-                with open(filename, 'rb') as f:
+                with open(filename, "rb") as f:
                     store_state = pickle.load(f)
             else:
                 store_state = {}
             store_state[name] = state
 
-            with open(filename, 'wb') as f:
+            with open(filename, "wb") as f:
                 pickle.dump(store_state, f, protocol=pickle.HIGHEST_PROTOCOL)
 
-    @device_override('network_restore')
-    def restore(self, name='default', filename=None,
-                restore_random_state=False):
-        '''
+    @device_override("network_restore")
+    def restore(self, name="default", filename=None, restore_random_state=False):
+        """
         restore(name='default', filename=None, restore_random_state=False)
 
         Retore the state of the network and all included objects.
@@ -614,44 +690,61 @@ class Network(Nameable):
             that this also restores numpy's random number generator (since it is
             used internally by Brian), but it does *not* restore Python's
             builtin random number generator in the ``random`` module.
-        '''
+        """
         all_objects = _get_all_objects(self.objects)
         if filename is None:
             state = self._stored_state[name]
         else:
-            with open(filename, 'rb') as f:
+            with open(filename, "rb") as f:
                 state = pickle.load(f)[name]
-        self.t_ = state['0_t']
+        self.t_ = state["0_t"]
         if restore_random_state:
             dev = get_device()
-            dev.set_random_state(state['_random_generator_state'])
+            dev.set_random_state(state["_random_generator_state"])
         clocks = {obj.clock for obj in all_objects}
         restored_objects = set()
         for obj in all_objects:
             if obj.name in state:
                 obj._restore_from_full_state(state[obj.name])
                 restored_objects.add(obj.name)
-            elif hasattr(obj, '_restore_from_full_state'):
-                raise KeyError(('Stored state does not have a stored state for '
-                                '"%s". Note that the names of all objects have '
-                                'to be identical to the names when they were '
-                                'stored.') % obj.name)
+            elif hasattr(obj, "_restore_from_full_state"):
+                raise KeyError(
+                    (
+                        "Stored state does not have a stored state for "
+                        '"%s". Note that the names of all objects have '
+                        "to be identical to the names when they were "
+                        "stored."
+                    )
+                    % obj.name
+                )
         for clock in clocks:
             clock._restore_from_full_state(state[clock.name])
         clock_names = {c.name for c in clocks}
 
-        unnused = (set(state.keys()) - restored_objects - clock_names -
-                   {'0_t', '_random_generator_state'})
+        unnused = (
+            set(state.keys())
+            - restored_objects
+            - clock_names
+            - {"0_t", "_random_generator_state"}
+        )
         if len(unnused):
-            raise KeyError('The stored state contains the state of the '
-                           'following objects which were not present in the '
-                           'network: %s. Note that the names of all objects '
-                           'have to be identical to the names when they were '
-                           'stored.' % (', '.join(unnused)))
+            raise KeyError(
+                "The stored state contains the state of the "
+                "following objects which were not present in the "
+                "network: %s. Note that the names of all objects "
+                "have to be identical to the names when they were "
+                "stored." % (", ".join(unnused))
+            )
 
-    def get_states(self, units=True, format='dict',
-                   subexpressions=False, read_only_variables=True, level=0):
-        '''
+    def get_states(
+        self,
+        units=True,
+        format="dict",
+        subexpressions=False,
+        read_only_variables=True,
+        level=0,
+    ):
+        """
         Return a copy of the current state variable values of objects in the
         network.. The returned arrays are copies of the actual arrays that
         store the state variable values, therefore changing the values in the
@@ -692,19 +785,22 @@ class Network(Nameable):
         See Also
         --------
         VariableOwner.get_states
-        '''
+        """
         states = dict()
         for obj in self.objects:
-            if hasattr(obj, 'get_states'):
-                states[obj.name] = obj.get_states(vars=None, units=units,
-                                                  format=format,
-                                                  subexpressions=subexpressions,
-                                                  read_only_variables=read_only_variables,
-                                                  level=level+1)
+            if hasattr(obj, "get_states"):
+                states[obj.name] = obj.get_states(
+                    vars=None,
+                    units=units,
+                    format=format,
+                    subexpressions=subexpressions,
+                    read_only_variables=read_only_variables,
+                    level=level + 1,
+                )
         return states
 
-    def set_states(self, values, units=True, format='dict', level=0):
-        '''
+    def set_states(self, values, units=True, format="dict", level=0):
+        """
         Set the state variables of objects in the network.
 
         Parameters
@@ -723,47 +819,58 @@ class Network(Nameable):
         See Also
         --------
         Group.set_states
-        '''
+        """
         # For the moment, 'dict' is the only supported format -- later this will
         # be made into an extensible system, see github issue #306
         for obj_name, obj_values in values.items():
             if obj_name not in self:
-                raise KeyError(("Network does not include a network with "
-                                "name '%s'.") % obj_name)
-            self[obj_name].set_states(obj_values, units=units, format=format,
-                                     level=level+1)
-
+                raise KeyError(
+                    ("Network does not include a network with " "name '%s'.") % obj_name
+                )
+            self[obj_name].set_states(
+                obj_values, units=units, format=format, level=level + 1
+            )
 
     def _get_schedule(self):
         if self._schedule is None:
             return list(prefs.core.network.default_schedule)
         else:
             return list(self._schedule)
-    
+
     def _set_schedule(self, schedule):
         if schedule is None:
             self._schedule = None
-            logger.debug('Resetting network {self.name} schedule to '
-                         'default schedule')
+            logger.debug(
+                "Resetting network {self.name} schedule to " "default schedule"
+            )
         else:
-            if (not isinstance(schedule, Sequence) or
-                    not all(isinstance(slot, str) for slot in schedule)):
-                raise TypeError('Schedule has to be None or a sequence of '
-                                'scheduling slots')
-            if any(slot.startswith('before_') or slot.startswith('after_')
-                   for slot in schedule):
-                raise ValueError('Slot names are not allowed to start with '
-                                 '"before_" or "after_" -- such slot names '
-                                 'are created automatically based on the '
-                                 'existing slot names.')
+            if not isinstance(schedule, Sequence) or not all(
+                isinstance(slot, str) for slot in schedule
+            ):
+                raise TypeError(
+                    "Schedule has to be None or a sequence of " "scheduling slots"
+                )
+            if any(
+                slot.startswith("before_") or slot.startswith("after_")
+                for slot in schedule
+            ):
+                raise ValueError(
+                    "Slot names are not allowed to start with "
+                    '"before_" or "after_" -- such slot names '
+                    "are created automatically based on the "
+                    "existing slot names."
+                )
             self._schedule = list(schedule)
-            logger.debug("Setting network {self.name} schedule to "
-                         "{self._schedule}".format(self=self),
-                         "_set_schedule")
-    
-    schedule = property(fget=_get_schedule,
-                        fset=_set_schedule,
-                        doc='''
+            logger.debug(
+                "Setting network {self.name} schedule to "
+                "{self._schedule}".format(self=self),
+                "_set_schedule",
+            )
+
+    schedule = property(
+        fget=_get_schedule,
+        fset=_set_schedule,
+        doc="""
         List of ``when`` slots in the order they will be updated, can be modified.
         
         See notes on scheduling in `Network`. Note that additional ``when``
@@ -773,13 +880,14 @@ class Network(Nameable):
 
         The schedule can also be set to ``None``, resetting it to the default
         schedule set by the `core.network.default_schedule` preference.
-        ''')
+        """,
+    )
 
     @property
     def sorted_objects(self):
-        '''
+        """
         The sorted objects of this network in the order defined by the schedule.
-        
+
         Objects are sorted first by their ``when`` attribute, and secondly
         by the ``order`` attribute. The order of the ``when`` attribute is
         defined by the ``schedule``. In addition to the slot names defined in
@@ -790,31 +898,32 @@ class Network(Nameable):
 
         Final ties are resolved using the objects' names, leading to an
         arbitrary but deterministic sorting.
-        '''
+        """
         # Provided slot names are assigned positions 1, 4, 7, ...
         # before_... names are assigned positions 0, 3, 6, ...
         # after_... names are assigned positions 2, 5, 8, ...
         all_objects = _get_all_objects(self.objects)
-        when_to_int = dict((when, 1+i*3)
-                           for i, when in enumerate(self.schedule))
-        when_to_int.update(('before_' + when, i*3)
-                           for i, when in enumerate(self.schedule))
-        when_to_int.update(('after_' + when, 2+i*3)
-                           for i, when in enumerate(self.schedule))
-        return sorted(all_objects, key=lambda obj: (when_to_int[obj.when],
-                                                    obj.order,
-                                                    obj.name))
+        when_to_int = dict((when, 1 + i * 3) for i, when in enumerate(self.schedule))
+        when_to_int.update(
+            ("before_" + when, i * 3) for i, when in enumerate(self.schedule)
+        )
+        when_to_int.update(
+            ("after_" + when, 2 + i * 3) for i, when in enumerate(self.schedule)
+        )
+        return sorted(
+            all_objects, key=lambda obj: (when_to_int[obj.when], obj.order, obj.name)
+        )
 
     def scheduling_summary(self):
-        '''
+        """
         Return a `SchedulingSummary` object, representing the scheduling
         information for all objects included in the network.
-        
+
         Returns
         -------
         summary : `SchedulingSummary`
             Object representing the scheduling information.
-        '''
+        """
         return SchedulingSummary(self.sorted_objects)
 
     def check_dependencies(self):
@@ -823,17 +932,22 @@ class Network(Nameable):
         for obj in all_objects:
             for dependency in obj._dependencies:
                 if not dependency in all_ids:
-                    raise ValueError(('"%s" has been included in the network '
-                                      'but not the object on which it '
-                                      'depends.') % obj.name)
+                    raise ValueError(
+                        (
+                            '"%s" has been included in the network '
+                            "but not the object on which it "
+                            "depends."
+                        )
+                        % obj.name
+                    )
 
-    @device_override('network_before_run')
+    @device_override("network_before_run")
     def before_run(self, run_namespace):
-        '''
+        """
         before_run(namespace)
 
         Prepares the `Network` for a run.
-        
+
         Objects in the `Network` are sorted into the correct running order, and
         their `BrianObject.before_run` methods are called.
 
@@ -842,20 +956,20 @@ class Network(Nameable):
         run_namespace : dict-like, optional
             A namespace in which objects which do not define their own
             namespace will be run.
-        '''
+        """
         all_objects = self.sorted_objects
         prefs.check_all_validated()
 
         # Check names in the network for uniqueness
         names = [obj.name for obj in all_objects]
-        non_unique_names = [name for name, count in Counter(names).items()
-                            if count > 1]
+        non_unique_names = [name for name, count in Counter(names).items() if count > 1]
         if len(non_unique_names):
-            formatted_names = ', '.join("'%s'" % name
-                                        for name in non_unique_names)
-            raise ValueError('All objects in a network need to have unique '
-                             'names, the following name(s) were used more than '
-                             'once: %s' % formatted_names)
+            formatted_names = ", ".join("'%s'" % name for name in non_unique_names)
+            raise ValueError(
+                "All objects in a network need to have unique "
+                "names, the following name(s) were used more than "
+                "once: %s" % formatted_names
+            )
 
         # Check that there are no SummedVariableUpdaters targeting the same
         # target variable
@@ -869,25 +983,34 @@ class Network(Nameable):
             # The device defines a fixed network schedule
             if device.network_schedule != self.schedule:
                 # TODO: The human-readable name of a device should be easier to get
-                device_name = list(all_devices.keys())[list(all_devices.values()).index(device)]
-                logger.warn(("The selected device '{device_name}' only "
-                             "supports a fixed schedule, but this schedule is "
-                             "not consistent with the network's schedule. The "
-                             "simulation will use the device's schedule.\n"
-                             "Device schedule: {device.network_schedule}\n"
-                             "Network schedule: {net.schedule}\n"
-                             "Set the network schedule explicitly or set the "
-                             "core.network.default_schedule preference to "
-                             "avoid this warning.").format(device_name=device_name,
-                                                           device=device,
-                                                           net=self),
-                            name_suffix='schedule_conflict', once=True)
+                device_name = list(all_devices.keys())[
+                    list(all_devices.values()).index(device)
+                ]
+                logger.warn(
+                    (
+                        "The selected device '{device_name}' only "
+                        "supports a fixed schedule, but this schedule is "
+                        "not consistent with the network's schedule. The "
+                        "simulation will use the device's schedule.\n"
+                        "Device schedule: {device.network_schedule}\n"
+                        "Network schedule: {net.schedule}\n"
+                        "Set the network schedule explicitly or set the "
+                        "core.network.default_schedule preference to "
+                        "avoid this warning."
+                    ).format(device_name=device_name, device=device, net=self),
+                    name_suffix="schedule_conflict",
+                    once=True,
+                )
 
-        logger.debug("Preparing network {self.name} with {numobj} "
-                     "objects: {objnames}".format(self=self,
-                        numobj=len(all_objects),
-                        objnames=', '.join(obj.name for obj in all_objects)),
-                     "before_run")
+        logger.debug(
+            "Preparing network {self.name} with {numobj} "
+            "objects: {objnames}".format(
+                self=self,
+                numobj=len(all_objects),
+                objnames=", ".join(obj.name for obj in all_objects),
+            ),
+            "before_run",
+        )
 
         self.check_dependencies()
 
@@ -896,55 +1019,79 @@ class Network(Nameable):
                 try:
                     obj.before_run(run_namespace)
                 except Exception as ex:
-                    raise BrianObjectException("An error occurred when preparing an object.", obj) from ex
+                    raise BrianObjectException(
+                        "An error occurred when preparing an object.", obj
+                    ) from ex
 
         # Check that no object has been run as part of another network before
         for obj in all_objects:
             if obj._network is None:
                 obj._network = self.id
             elif obj._network != self.id:
-                raise RuntimeError(('%s has already been run in the '
-                                    'context of another network. Use '
-                                    'add/remove to change the objects '
-                                    'in a simulated network instead of '
-                                    'creating a new one.') % obj.name)
+                raise RuntimeError(
+                    (
+                        "%s has already been run in the "
+                        "context of another network. Use "
+                        "add/remove to change the objects "
+                        "in a simulated network instead of "
+                        "creating a new one."
+                    )
+                    % obj.name
+                )
 
-        logger.debug("Network {self.name} uses {num} "
-                     "clocks: {clocknames}".format(self=self,
-                        num=len(self._clocks),
-                        clocknames=', '.join('%s (dt=%s)' % (obj.name, obj.dt)
-                                             for obj in self._clocks)),
-                     "before_run")
+        logger.debug(
+            "Network {self.name} uses {num} "
+            "clocks: {clocknames}".format(
+                self=self,
+                num=len(self._clocks),
+                clocknames=", ".join(
+                    "%s (dt=%s)" % (obj.name, obj.dt) for obj in self._clocks
+                ),
+            ),
+            "before_run",
+        )
 
-    @device_override('network_after_run')
+    @device_override("network_after_run")
     def after_run(self):
-        '''
+        """
         after_run()
-        '''
+        """
         for obj in self.sorted_objects:
             if obj.active:
                 obj.after_run()
-        
+
     def _nextclocks(self):
-        clocks_times_dt = [(c,
-                            self._clock_variables[c][1][0],
-                            self._clock_variables[c][2][0])
-                        for c in self._clocks]
+        clocks_times_dt = [
+            (c, self._clock_variables[c][1][0], self._clock_variables[c][2][0])
+            for c in self._clocks
+        ]
         minclock, min_time, minclock_dt = min(clocks_times_dt, key=lambda k: k[1])
-        curclocks = {clock for clock, time, dt in clocks_times_dt if
-                        (time == min_time or
-                         abs(time - min_time)/min(minclock_dt, dt) < Clock.epsilon_dt)}
+        curclocks = {
+            clock
+            for clock, time, dt in clocks_times_dt
+            if (
+                time == min_time
+                or abs(time - min_time) / min(minclock_dt, dt) < Clock.epsilon_dt
+            )
+        }
         return minclock, curclocks
 
-    @device_override('network_run')
+    @device_override("network_run")
     @check_units(duration=second, report_period=second)
-    def run(self, duration, report=None, report_period=10*second,
-            namespace=None, profile=False, level=0):
-        '''
+    def run(
+        self,
+        duration,
+        report=None,
+        report_period=10 * second,
+        namespace=None,
+        profile=False,
+        level=0,
+    ):
+        """
         run(duration, report=None, report_period=60*second, namespace=None, level=0)
-        
+
         Runs the simulation for the given duration.
-        
+
         Parameters
         ----------
         duration : `Quantity`
@@ -979,7 +1126,7 @@ class Network(Nameable):
         -----
         The simulation can be stopped by calling `Network.stop` or the
         global `stop` function.
-        '''
+        """
         all_objects = self.sorted_objects
         device = get_device()  # Do not use the ProxyDevice -- slightly faster
         self._clocks = {obj.clock for obj in all_objects}
@@ -994,16 +1141,20 @@ class Network(Nameable):
         else:
             # We get direct references to the underlying variables for all clocks
             # to avoid expensive access during the run loop
-            self._clock_variables = {c : (c.variables['timestep'].get_value(),
-                                          c.variables['t'].get_value(),
-                                          c.variables['dt'].get_value())
-                                     for c in self._clocks}
+            self._clock_variables = {
+                c: (
+                    c.variables["timestep"].get_value(),
+                    c.variables["t"].get_value(),
+                    c.variables["dt"].get_value(),
+                )
+                for c in self._clocks
+            }
             for clock in self._clocks:
                 clock.set_interval(self.t, t_end)
 
         # Get the local namespace
         if namespace is None:
-            namespace = get_local_namespace(level=level+3)
+            namespace = get_local_namespace(level=level + 3)
 
         self.before_run(namespace)
 
@@ -1012,36 +1163,44 @@ class Network(Nameable):
 
         start_time = time.time()
 
-        logger.debug("Simulating network '%s' from time %s to %s." % (self.name,
-                                                                      t_start,
-                                                                      t_end),
-                     'run')
+        logger.debug(
+            "Simulating network '%s' from time %s to %s." % (self.name, t_start, t_end),
+            "run",
+        )
 
         if report is not None:
             report_period = float(report_period)
             next_report_time = start_time + report_period
-            if report == 'text' or report == 'stdout':
+            if report == "text" or report == "stdout":
                 report_callback = TextReport(sys.stdout)
-            elif report == 'stderr':
+            elif report == "stderr":
                 report_callback = TextReport(sys.stderr)
             elif isinstance(report, str):
-                raise ValueError(('Do not know how to handle report argument '
-                                  '"%s".' % report))
+                raise ValueError(
+                    ("Do not know how to handle report argument " '"%s".' % report)
+                )
             elif callable(report):
                 report_callback = report
             else:
-                raise TypeError(('Do not know how to handle report argument, '
-                                 'it has to be one of "text", "stdout", '
-                                 '"stderr", or a callable function/object, '
-                                 'but it is of type %s') % type(report))
-            report_callback(0*second, 0.0, t_start, duration)
+                raise TypeError(
+                    (
+                        "Do not know how to handle report argument, "
+                        'it has to be one of "text", "stdout", '
+                        '"stderr", or a callable function/object, '
+                        "but it is of type %s"
+                    )
+                    % type(report)
+                )
+            report_callback(0 * second, 0.0, t_start, duration)
 
         profiling_info = defaultdict(float)
 
         if single_clock:
-            timestep, t, dt = (clock.variables['timestep'].get_value(),
-                               clock.variables['t'].get_value(),
-                               clock.variables['dt'].get_value())
+            timestep, t, dt = (
+                clock.variables["timestep"].get_value(),
+                clock.variables["t"].get_value(),
+                clock.variables["dt"].get_value(),
+            )
         else:
             # Find the first clock to be updated (see note below)
             clock, curclocks = self._nextclocks()
@@ -1059,9 +1218,12 @@ class Network(Nameable):
             if report is not None:
                 current = time.time()
                 if current > next_report_time:
-                    report_callback((current-start_time)*second,
-                                    (self.t_ - float(t_start))/float(t_end - t_start),
-                                    t_start, duration)
+                    report_callback(
+                        (current - start_time) * second,
+                        (self.t_ - float(t_start)) / float(t_end - t_start),
+                        t_start,
+                        duration,
+                    )
                     next_report_time = current + report_period
 
             # update the objects and tick forward the clock(s)
@@ -1070,7 +1232,7 @@ class Network(Nameable):
                     for obj in active_objects:
                         obj_time = time.time()
                         obj.run()
-                        profiling_info[obj.name] += (time.time() - obj_time)
+                        profiling_info[obj.name] += time.time() - obj_time
                 else:
                     for obj in active_objects:
                         obj.run()
@@ -1083,7 +1245,7 @@ class Network(Nameable):
                         if obj._clock in curclocks:
                             obj_time = time.time()
                             obj.run()
-                            profiling_info[obj.name] += (time.time() - obj_time)
+                            profiling_info[obj.name] += time.time() - obj_time
                 else:
                     for obj in active_objects:
                         if obj._clock in curclocks:
@@ -1100,7 +1262,10 @@ class Network(Nameable):
                 clock, curclocks = self._nextclocks()
                 timestep, _, _ = self._clock_variables[clock]
 
-            if device._maximum_run_time is not None and time.time()-start_time>float(device._maximum_run_time):
+            if (
+                device._maximum_run_time is not None
+                and time.time() - start_time > float(device._maximum_run_time)
+            ):
                 self._stopped = True
             else:
                 running = timestep[0] < clock._i_end
@@ -1111,9 +1276,9 @@ class Network(Nameable):
         else:
             self.t_ = float(t_end)
 
-        device._last_run_time = end_time-start_time
-        if duration>0:
-            device._last_run_completed_fraction = (self.t-t_start)/duration
+        device._last_run_time = end_time - start_time
+        if duration > 0:
+            device._last_run_completed_fraction = (self.t - t_start) / duration
         else:
             device._last_run_completed_fraction = 1.0
 
@@ -1123,38 +1288,43 @@ class Network(Nameable):
                 obj._check_for_invalid_states()
 
         if report is not None:
-            report_callback((end_time-start_time)*second, 1.0, t_start, duration)
+            report_callback((end_time - start_time) * second, 1.0, t_start, duration)
         self.after_run()
 
-        logger.debug(("Finished simulating network '%s' "
-                      "(took %.2fs)") % (self.name, end_time-start_time),
-                     'run')
+        logger.debug(
+            ("Finished simulating network '%s' " "(took %.2fs)")
+            % (self.name, end_time - start_time),
+            "run",
+        )
         # Store profiling info (or erase old info to avoid confusion)
         if profile:
-            self._profiling_info = [(name, t*second)
-                                    for name, t in profiling_info.items()]
+            self._profiling_info = [
+                (name, t * second) for name, t in profiling_info.items()
+            ]
             # Dump a profiling summary to the log
-            logger.debug('\n' + str(profiling_summary(self)))
+            logger.debug("\n" + str(profiling_summary(self)))
         else:
             self._profiling_info = None
 
-    @device_override('network_stop')
+    @device_override("network_stop")
     def stop(self):
-        '''
+        """
         stop()
 
         Stops the network from running, this is reset the next time `Network.run` is called.
-        '''
+        """
         self._stopped = True
 
     def __repr__(self):
-        return '<%s at time t=%s, containing objects: %s>' % (self.__class__.__name__,
-                                                              str(self.t),
-                                                              ', '.join((obj.__repr__() for obj in _get_all_objects(self.objects))))
+        return "<%s at time t=%s, containing objects: %s>" % (
+            self.__class__.__name__,
+            str(self.t),
+            ", ".join((obj.__repr__() for obj in _get_all_objects(self.objects))),
+        )
 
 
 class ProfilingSummary(object):
-    '''
+    """
     Class to nicely display the results of profiling. Objects of this class are
     returned by `profiling_summary`.
 
@@ -1170,61 +1340,69 @@ class ProfilingSummary(object):
     See Also
     --------
     Network.profiling_info
-    '''
+    """
+
     def __init__(self, net, show=None):
         prof = net.profiling_info
         if len(prof):
             names, times = list(zip(*prof))
         else:  # Can happen if a network has been run for 0ms
             # Use a dummy entry to prevent problems with empty lists later
-            names = ['no code objects have been run']
-            times = [0*second]
+            names = ["no code objects have been run"]
+            times = [0 * second]
         self.total_time = sum(times)
         self.time_unit = msecond
-        if self.total_time>1*second:
+        if self.total_time > 1 * second:
             self.time_unit = second
         if show is not None:
             names = names[:show]
             times = times[:show]
-        if self.total_time>0*second:
-            self.percentages = [100.0*time/self.total_time for time in times]
+        if self.total_time > 0 * second:
+            self.percentages = [100.0 * time / self.total_time for time in times]
         else:
-            self.percentages = [0. for _ in times]
+            self.percentages = [0.0 for _ in times]
         self.names_maxlen = max(len(name) for name in names)
-        self.names = [name+' '*(self.names_maxlen-len(name)) for name in names]
+        self.names = [name + " " * (self.names_maxlen - len(name)) for name in names]
         self.times = times
 
     def __repr__(self):
-        times = ['%.2f %s' % (time/self.time_unit, self.time_unit) for time in self.times]
+        times = [
+            "%.2f %s" % (time / self.time_unit, self.time_unit) for time in self.times
+        ]
         times_maxlen = max(len(time) for time in times)
-        times = [' '*(times_maxlen-len(time))+time for time in times]
-        percentages = ['%.2f %%' % percentage for percentage in self.percentages]
+        times = [" " * (times_maxlen - len(time)) + time for time in times]
+        percentages = ["%.2f %%" % percentage for percentage in self.percentages]
         percentages_maxlen = max(len(percentage) for percentage in percentages)
-        percentages = [(' '*(percentages_maxlen-len(percentage)))+percentage for percentage in percentages]
+        percentages = [
+            (" " * (percentages_maxlen - len(percentage))) + percentage
+            for percentage in percentages
+        ]
 
-        s = 'Profiling summary'
-        s += '\n'+'='*len(s)+'\n'
+        s = "Profiling summary"
+        s += "\n" + "=" * len(s) + "\n"
         for name, time, percentage in zip(self.names, times, percentages):
-            s += '%s    %s    %s\n' % (name, time, percentage)
+            s += "%s    %s    %s\n" % (name, time, percentage)
         return s
 
     def _repr_html_(self):
-        times = ['%.2f %s' % (time/self.time_unit, self.time_unit) for time in self.times]
-        percentages = ['%.2f %%' % percentage for percentage in self.percentages]
+        times = [
+            "%.2f %s" % (time / self.time_unit, self.time_unit) for time in self.times
+        ]
+        percentages = ["%.2f %%" % percentage for percentage in self.percentages]
         s = '<h2 class="brian_prof_summary_header">Profiling summary</h2>\n'
         s += '<table class="brian_prof_summary_table">\n'
         for name, time, percentage in zip(self.names, times, percentages):
-            s += '<tr>'
-            s += '<td>%s</td>' % name
+            s += "<tr>"
+            s += "<td>%s</td>" % name
             s += '<td style="text-align: right">%s</td>' % time
             s += '<td style="text-align: right">%s</td>' % percentage
-            s += '</tr>\n'
-        s += '</table>'
+            s += "</tr>\n"
+        s += "</table>"
         return s
 
 
 def profiling_summary(net=None, show=None):
-    '''
+    """
     Returns a `ProfilingSummary` of the profiling info for a run. This object
     can be transformed to a string explicitly but on an interactive console
     simply calling `profiling_summary` is enough since it will
@@ -1238,15 +1416,16 @@ def profiling_summary(net=None, show=None):
     show : int
         The number of results to show (the longest results will be shown). If
         not specified, all results will be shown.
-    '''
+    """
     if net is None:
         from .magic import magic_network
+
         net = magic_network
     return ProfilingSummary(net, show)
 
 
 def scheduling_summary(net=None):
-    '''
+    """
     Returns a `SchedulingSummary` object, representing the scheduling
     information for all objects included in the given `Network` (or the
     "magic" network, if none is specified). The returned objects can be
@@ -1264,16 +1443,17 @@ def scheduling_summary(net=None):
     -------
     summary : `SchedulingSummary`
         An object that represents the scheduling information.
-    '''
+    """
     if net is None:
         from .magic import magic_network
+
         magic_network._update_magic_objects(level=1)
         net = magic_network
     return net.scheduling_summary()
 
 
 def schedule_propagation_offset(net=None):
-    '''
+    """
     Returns the minimal time difference for a post-synaptic effect after a
     spike. With the default schedule, this time difference is 0, since the
     ``thresholds`` slot precedes the ``synapses`` slot. For the GeNN device,
@@ -1295,7 +1475,7 @@ def schedule_propagation_offset(net=None):
     -----
     This function always returns ``0*ms`` or ``defaultclock.dt`` -- no attempt
     is made to deal with other clocks.
-    '''
+    """
     from brian2.core.magic import magic_network
 
     device = get_device()
@@ -1306,7 +1486,7 @@ def schedule_propagation_offset(net=None):
             net = magic_network
         schedule = net.schedule
 
-    if schedule.index('thresholds') < schedule.index('synapses'):
-        return 0*second
+    if schedule.index("thresholds") < schedule.index("synapses"):
+        return 0 * second
     else:
         return defaultclock.dt

@@ -16,6 +16,7 @@ from brian2.parsing.rendering import NodeRenderer, get_node_value
 from brian2.utils.stringtools import get_identifiers, word_substitute
 from brian2.core.preferences import prefs
 
+
 from .statements import Statement
 
 # Default namespace has all the standard functions and constants in it

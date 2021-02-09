@@ -1115,6 +1115,7 @@ def is_stateful(expression, variables):
     return False
 
 
+
 def check_subexpressions(group, equations, run_namespace):
     '''
     Checks the subexpressions in the equations and raises an error if a

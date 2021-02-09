@@ -732,6 +732,7 @@ class Group(VariableOwner, BrianObject):
             An additional mapping of names to `Variable` objects that will be
             checked before `Group.variables`.
 
+
         Returns
         -------
         obj : `Variable` or `Function`

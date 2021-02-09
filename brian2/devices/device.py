@@ -1,7 +1,7 @@
-'''
+"""
 Module containing the `Device` base class as well as the `RuntimeDevice`
 implementation and some helper functions to access/set devices.
-'''
+"""
 
 from weakref import WeakKeyDictionary
 import numbers
@@ -17,18 +17,25 @@ from brian2.units import ms
 from brian2.utils.logger import get_logger
 from brian2.utils.stringtools import code_representation, indent
 
-__all__ = ['Device', 'RuntimeDevice',
-           'get_device', 'set_device',
-           'all_devices', 'reinit_devices', 'reinit_and_delete',
-           'reset_device', 'device', 'seed'
-           ]
+__all__ = [
+    "Device",
+    "RuntimeDevice",
+    "get_device",
+    "set_device",
+    "all_devices",
+    "reinit_devices",
+    "reinit_and_delete",
+    "reset_device",
+    "device",
+    "seed",
+]
 
 logger = get_logger(__name__)
 
 all_devices = {}
 
 
-prefs.register_preferences('devices', 'Device preferences')
+prefs.register_preferences("devices", "Device preferences")
 
 
 #: caches the automatically determined code generation target
@@ -36,7 +43,7 @@ _auto_target = None
 
 
 def auto_target():
-    '''
+    """
     Automatically chose a code generation target (invoked when the
     `codegen.target` preference is set to `'auto'`. Caches its result so it
     only does the check once. Prefers cython > numpy.
@@ -45,37 +52,45 @@ def auto_target():
     -------
     target : class derived from `CodeObject`
         The target to use
-    '''
+    """
     global _auto_target
     if _auto_target is None:
-        target_dict = dict((target.class_name, target)
-                           for target in codegen_targets
-                           if target.class_name)
+        target_dict = dict(
+            (target.class_name, target)
+            for target in codegen_targets
+            if target.class_name
+        )
         using_fallback = False
-        if 'cython' in target_dict and target_dict['cython'].is_available():
-            _auto_target = target_dict['cython']
+        if "cython" in target_dict and target_dict["cython"].is_available():
+            _auto_target = target_dict["cython"]
         else:
-            _auto_target = target_dict['numpy']
+            _auto_target = target_dict["numpy"]
             using_fallback = True
 
         if using_fallback:
-            logger.info('Cannot use compiled code, falling back to the numpy '
-                        'code generation target. Note that this will likely '
-                        'be slower than using compiled code. Set the code '
-                        'generation to numpy manually to avoid this message:\n'
-                        'prefs.codegen.target = "numpy"',
-                        'codegen_fallback', once=True)
+            logger.info(
+                "Cannot use compiled code, falling back to the numpy "
+                "code generation target. Note that this will likely "
+                "be slower than using compiled code. Set the code "
+                "generation to numpy manually to avoid this message:\n"
+                'prefs.codegen.target = "numpy"',
+                "codegen_fallback",
+                once=True,
+            )
         else:
-            logger.debug(('Chosing %r as the code generation '
-                         'target.') % _auto_target.class_name)
+            logger.debug(
+                ("Chosing %r as the code generation " "target.")
+                % _auto_target.class_name
+            )
 
     return _auto_target
 
 
 class Device(object):
-    '''
+    """
     Base Device object.
-    '''
+    """
+
     def __init__(self):
         #: The network schedule that this device supports. If the device only
         #: supports a specific, fixed schedule, it has to set this attribute to
@@ -91,14 +106,14 @@ class Device(object):
         self._state_tuple = (self.__module__, self.__class__.__name__)
 
     def _set_maximum_run_time(self, maximum_run_time):
-        '''
+        """
         Sets a maximum time for a run before it will break. Used primarily for testing purposes. Not guaranteed to be
         respected by a device.
-        '''
+        """
         self._maximum_run_time = maximum_run_time
 
     def get_array_name(self, var, access_data=True):
-        '''
+        """
         Return a globally unique name for `var`.
 
         Parameters
@@ -112,11 +127,11 @@ class Device(object):
         -------
         name : str
             The name for `var`.
-        '''
+        """
         raise NotImplementedError()
 
     def get_len(self, array):
-        '''
+        """
         Return the length of the array.
 
         Parameters
@@ -128,22 +143,22 @@ class Device(object):
         -------
         l : int
             The length of the array.
-        '''
+        """
         raise NotImplementedError()
 
     def add_array(self, var):
-        '''
+        """
         Add an array to this device.
 
         Parameters
         ----------
         var : `ArrayVariable`
             The array to add.
-        '''
+        """
         raise NotImplementedError()
 
     def init_with_zeros(self, var, dtype):
-        '''
+        """
         Initialize an array with zeros.
 
         Parameters
@@ -152,11 +167,11 @@ class Device(object):
             The array to initialize with zeros.
         dtype : `dtype`
             The data type to use for the array.
-        '''
+        """
         raise NotImplementedError()
 
     def init_with_arange(self, var, start, dtype):
-        '''
+        """
         Initialize an array with an integer range.
 
         Parameters
@@ -167,11 +182,11 @@ class Device(object):
             The start value for the integer range
         dtype : `dtype`
             The data type to use for the array.
-        '''
+        """
         raise NotImplementedError()
 
     def fill_with_array(self, var, arr):
-        '''
+        """
         Fill an array with the values given in another array.
 
         Parameters
@@ -180,11 +195,11 @@ class Device(object):
             The array to fill.
         arr : `ndarray`
             The array values that should be copied to `var`.
-        '''
+        """
         raise NotImplementedError()
 
     def spike_queue(self, source_start, source_end):
-        '''
+        """
         Create and return a new `SpikeQueue` for this `Device`.
 
         Parameters
@@ -193,11 +208,11 @@ class Device(object):
             The start index of the source group (necessary for subgroups)
         source_end : int
             The end index of the source group (necessary for subgroups)
-        '''
+        """
         raise NotImplementedError()
 
     def resize(self, var, new_size):
-        '''
+        """
         Resize a `DynamicArrayVariable`.
 
         Parameters
@@ -206,7 +221,7 @@ class Device(object):
             The variable that should be resized.
         new_size : int
             The new size of the variable
-        '''
+        """
         raise NotImplementedError()
 
     def resize_along_first(self, var, new_size):
@@ -214,7 +229,7 @@ class Device(object):
         return self.resize(var, new_size)
 
     def seed(self, seed=None):
-        '''
+        """
         Set the seed for the random number generator.
 
         Parameters
@@ -222,11 +237,11 @@ class Device(object):
         seed : int, optional
             The seed value for the random number generator, or ``None`` (the
             default) to set a random seed.
-        '''
+        """
         raise NotImplementedError()
 
-    def code_object_class(self, codeobj_class=None, fallback_pref='codegen.target'):
-        '''
+    def code_object_class(self, codeobj_class=None, fallback_pref="codegen.target"):
+        """
         Return `CodeObject` class according to input/default settings
 
         Parameters
@@ -243,126 +258,160 @@ class Device(object):
         -------
         codeobj_class : class
             The `CodeObject` class that should be used
-        '''
+        """
         if isinstance(codeobj_class, str):
-            raise TypeError("codeobj_class argument given to code_object_class device method "
-                            "should be a CodeObject class, not a string. You can, however, "
-                            "send a string description of the target desired for the CodeObject "
-                            "under the keyword fallback_pref")
+            raise TypeError(
+                "codeobj_class argument given to code_object_class device method "
+                "should be a CodeObject class, not a string. You can, however, "
+                "send a string description of the target desired for the CodeObject "
+                "under the keyword fallback_pref"
+            )
         if codeobj_class is None:
             codeobj_class = prefs[fallback_pref]
             if isinstance(codeobj_class, str):
-                if codeobj_class == 'auto':
+                if codeobj_class == "auto":
                     return auto_target()
                 for target in codegen_targets:
                     if target.class_name == codeobj_class:
                         return target
                 # No target found
-                targets = ['auto'] + [target.class_name
-                                      for target in codegen_targets
-                                      if target.class_name]
-                raise ValueError("Unknown code generation target: %s, should be "
-                                 " one of %s" % (codeobj_class, targets))
+                targets = ["auto"] + [
+                    target.class_name for target in codegen_targets if target.class_name
+                ]
+                raise ValueError(
+                    "Unknown code generation target: %s, should be "
+                    " one of %s" % (codeobj_class, targets)
+                )
         else:
             return codeobj_class
 
-    def code_object(self, owner, name, abstract_code, variables, template_name,
-                    variable_indices, codeobj_class=None,
-                    template_kwds=None, override_conditional_write=None,
-                    compiler_kwds=None):
+    def code_object(
+        self,
+        owner,
+        name,
+        abstract_code,
+        variables,
+        template_name,
+        variable_indices,
+        codeobj_class=None,
+        template_kwds=None,
+        override_conditional_write=None,
+        compiler_kwds=None,
+    ):
         if compiler_kwds is None:
             compiler_kwds = {}
         name = find_name(name)
         codeobj_class = self.code_object_class(codeobj_class)
         template = getattr(codeobj_class.templater, template_name)
         iterate_all = template.iterate_all
-        generator = codeobj_class.generator_class(variables=variables,
-                                                  variable_indices=variable_indices,
-                                                  owner=owner,
-                                                  iterate_all=iterate_all,
-                                                  codeobj_class=codeobj_class,
-                                                  override_conditional_write=override_conditional_write,
-                                                  allows_scalar_write=template.allows_scalar_write,
-                                                  name=name,
-                                                  template_name=template_name)
+        generator = codeobj_class.generator_class(
+            variables=variables,
+            variable_indices=variable_indices,
+            owner=owner,
+            iterate_all=iterate_all,
+            codeobj_class=codeobj_class,
+            override_conditional_write=override_conditional_write,
+            allows_scalar_write=template.allows_scalar_write,
+            name=name,
+            template_name=template_name,
+        )
         if template_kwds is None:
             template_kwds = dict()
         else:
             template_kwds = template_kwds.copy()
 
-        logger.diagnostic('%s abstract code:\n%s' % (name, indent(code_representation(abstract_code))))
+        logger.diagnostic(
+            "%s abstract code:\n%s" % (name, indent(code_representation(abstract_code)))
+        )
 
-        scalar_code, vector_code, kwds = generator.translate(abstract_code,
-                                                             dtype=prefs['core.default_float_dtype'])
+        scalar_code, vector_code, kwds = generator.translate(
+            abstract_code, dtype=prefs["core.default_float_dtype"]
+        )
         # Add the array names as keywords as well
         for varname, var in variables.items():
             if isinstance(var, ArrayVariable):
                 pointer_name = generator.get_array_name(var)
                 if var.scalar:
-                    pointer_name += '[0]'
+                    pointer_name += "[0]"
                 template_kwds[varname] = pointer_name
-                if hasattr(var, 'resize'):
-                    dyn_array_name = generator.get_array_name(var,
-                                                              access_data=False)
-                    template_kwds['_dynamic_'+varname] = dyn_array_name
-
+                if hasattr(var, "resize"):
+                    dyn_array_name = generator.get_array_name(var, access_data=False)
+                    template_kwds["_dynamic_" + varname] = dyn_array_name
 
         template_kwds.update(kwds)
-        logger.diagnostic('%s snippet (scalar):\n%s' % (name, indent(code_representation(scalar_code))))
-        logger.diagnostic('%s snippet (vector):\n%s' % (name, indent(code_representation(vector_code))))
+        logger.diagnostic(
+            "%s snippet (scalar):\n%s"
+            % (name, indent(code_representation(scalar_code)))
+        )
+        logger.diagnostic(
+            "%s snippet (vector):\n%s"
+            % (name, indent(code_representation(vector_code)))
+        )
 
-        code = template(scalar_code, vector_code,
-                        owner=owner, variables=variables, codeobj_name=name,
-                        variable_indices=variable_indices,
-                        get_array_name=generator.get_array_name,
-                        **template_kwds)
-        logger.diagnostic('%s code:\n%s' % (name, indent(code_representation(code))))
+        code = template(
+            scalar_code,
+            vector_code,
+            owner=owner,
+            variables=variables,
+            codeobj_name=name,
+            variable_indices=variable_indices,
+            get_array_name=generator.get_array_name,
+            **template_kwds
+        )
+        logger.diagnostic("%s code:\n%s" % (name, indent(code_representation(code))))
 
-        codeobj = codeobj_class(owner, code, variables, variable_indices,
-                                template_name=template_name,
-                                template_source=template.template_source,
-                                name=name, compiler_kwds=compiler_kwds)
+        codeobj = codeobj_class(
+            owner,
+            code,
+            variables,
+            variable_indices,
+            template_name=template_name,
+            template_source=template.template_source,
+            name=name,
+            compiler_kwds=compiler_kwds,
+        )
         codeobj.compile()
         return codeobj
-    
+
     def activate(self, build_on_run=True, **kwargs):
-        '''
+        """
         Called when this device is set as the current device.
-        '''
+        """
         from brian2.core.clocks import Clock  # avoid import issues
 
         if self.defaultclock is None:
-            self.defaultclock = Clock(dt=0.1*ms, name='defaultclock')
+            self.defaultclock = Clock(dt=0.1 * ms, name="defaultclock")
         self._set_maximum_run_time(None)
         self.build_on_run = build_on_run
         self.build_options = dict(kwargs)
 
     def insert_device_code(self, slot, code):
         # Deprecated
-        raise AttributeError("The method 'insert_device_code' has been renamed "
-                             "to 'insert_code'.")
+        raise AttributeError(
+            "The method 'insert_device_code' has been renamed " "to 'insert_code'."
+        )
 
     def insert_code(self, slot, code):
-        '''
+        """
         Insert code directly into a given slot in the device. By default does nothing.
-        '''
+        """
         logger.warn("Ignoring device code, unknown slot: %s, code: %s" % (slot, code))
-        
+
     def build(self, **kwds):
-        '''
+        """
         For standalone projects, called when the project is ready to be built. Does nothing for runtime mode.
-        '''
+        """
         pass
 
     def reinit(self):
-        '''
+        """
         Reinitialize the device. For standalone devices, clears all the internal
         state of the device.
-        '''
+        """
         pass
 
     def delete(self, data=True, code=True, directory=True, force=False):
-        '''
+        """
         Delete code and/or data generated/stored by the device.
 
         Parameters
@@ -384,11 +433,11 @@ class Device(object):
             if it contains files that were not created by Brian. Useful only
             when the ``directory`` option is set to ``True`` as well. Defaults
             to ``False``.
-        '''
+        """
         pass
 
     def get_random_state(self):
-        '''
+        """
         Return a (pickable) representation of the current random number
         generator state. Providing the returned object (e.g. a dict) to
         `.Device.set_random_state` should restore the random number generator
@@ -399,12 +448,14 @@ class Device(object):
         state
             The state of the random number generator in a representation
             that can be passed as an argument to `.Device.set_random_state`.
-        '''
-        raise NotImplementedError('Device does not support getting the state '
-                                  'of the random number generator.')
+        """
+        raise NotImplementedError(
+            "Device does not support getting the state "
+            "of the random number generator."
+        )
 
     def set_random_state(self, state):
-        '''
+        """
         Reset the random number generator state to a previously stored state
         (see `.Device.get_random_state`).
 
@@ -413,16 +464,19 @@ class Device(object):
         state
             A random number generator state as provided by
             `Device.get_random_state`.
-        '''
-        raise NotImplementedError('Device does not support setting the state '
-                                  'of the random number generator.')
+        """
+        raise NotImplementedError(
+            "Device does not support setting the state "
+            "of the random number generator."
+        )
 
 
 class RuntimeDevice(Device):
-    '''
+    """
     The default device used in Brian, state variables are stored as numpy
     arrays in memory.
-    '''
+    """
+
     def __init__(self):
         super(RuntimeDevice, self).__init__()
         #: Mapping from `Variable` objects to numpy arrays (or `DynamicArray`
@@ -440,18 +494,19 @@ class RuntimeDevice(Device):
         # if no owner is set, this is a temporary object (e.g. the array
         # of indices when doing G.x[indices] = ...). The name is not
         # necessarily unique over several CodeObjects in this case.
-        owner_name = getattr(var.owner, 'name', 'temporary')
+        owner_name = getattr(var.owner, "name", "temporary")
 
         if isinstance(var, DynamicArrayVariable):
             if access_data:
-                return '_array_' + owner_name + '_' + var.name
+                return "_array_" + owner_name + "_" + var.name
             else:
-                return '_dynamic_array_' + owner_name + '_' + var.name
+                return "_dynamic_array_" + owner_name + "_" + var.name
         elif isinstance(var, ArrayVariable):
-            return '_array_' + owner_name + '_' + var.name
+            return "_array_" + owner_name + "_" + var.name
         else:
-            raise TypeError(('Do not have a name for variable of type '
-                             '%s') % type(var))
+            raise TypeError(
+                ("Do not have a name for variable of type " "%s") % type(var)
+            )
 
     def add_array(self, var):
         # This creates the actual numpy arrays (or DynamicArrayVariable objects)
@@ -467,7 +522,7 @@ class RuntimeDevice(Device):
 
     def get_value(self, var, access_data=True):
         if isinstance(var, DynamicArrayVariable) and access_data:
-                return self.arrays[var].data
+            return self.arrays[var].data
         else:
             return self.arrays[var]
 
@@ -484,8 +539,7 @@ class RuntimeDevice(Device):
         self.arrays[var][:] = 0
 
     def init_with_arange(self, var, start, dtype):
-        self.arrays[var][:] = np.arange(start, stop=var.get_len()+start,
-                                        dtype=dtype)
+        self.arrays[var][:] = np.arange(start, stop=var.get_len() + start, dtype=dtype)
 
     def fill_with_array(self, var, arr):
         self.arrays[var][:] = arr
@@ -494,15 +548,17 @@ class RuntimeDevice(Device):
         # Use the C++ version of the SpikeQueue when available
         try:
             from brian2.synapses.cythonspikequeue import SpikeQueue
-            logger.diagnostic('Using the C++ SpikeQueue', once=True)
+
+            logger.diagnostic("Using the C++ SpikeQueue", once=True)
         except ImportError:
             from brian2.synapses.spikequeue import SpikeQueue
-            logger.diagnostic('Using the Python SpikeQueue', once=True)
+
+            logger.diagnostic("Using the Python SpikeQueue", once=True)
 
         return SpikeQueue(source_start=source_start, source_end=source_end)
 
     def seed(self, seed=None):
-        '''
+        """
         Set the seed for the random number generator.
 
         Parameters
@@ -510,62 +566,74 @@ class RuntimeDevice(Device):
         seed : int, optional
             The seed value for the random number generator, or ``None`` (the
             default) to set a random seed.
-        '''
+        """
         np.random.seed(seed)
         self.rand_buffer_index[:] = 0
         self.randn_buffer_index[:] = 0
 
     def get_random_state(self):
-        return {'numpy_state': np.random.get_state(),
-                'rand_buffer_index': np.array(self.rand_buffer_index),
-                'rand_buffer': np.array(self.rand_buffer),
-                'randn_buffer_index': np.array(self.randn_buffer_index),
-                'randn_buffer': np.array(self.randn_buffer)
-                }
+        return {
+            "numpy_state": np.random.get_state(),
+            "rand_buffer_index": np.array(self.rand_buffer_index),
+            "rand_buffer": np.array(self.rand_buffer),
+            "randn_buffer_index": np.array(self.randn_buffer_index),
+            "randn_buffer": np.array(self.randn_buffer),
+        }
 
     def set_random_state(self, state):
-        np.random.set_state(state['numpy_state'])
-        self.rand_buffer_index[:] = state['rand_buffer_index']
-        self.rand_buffer[:] = state['rand_buffer']
-        self.randn_buffer_index[:] = state['randn_buffer_index']
-        self.randn_buffer[:] = state['randn_buffer']
+        np.random.set_state(state["numpy_state"])
+        self.rand_buffer_index[:] = state["rand_buffer_index"]
+        self.rand_buffer[:] = state["rand_buffer"]
+        self.randn_buffer_index[:] = state["randn_buffer_index"]
+        self.randn_buffer[:] = state["randn_buffer"]
 
 
 class Dummy(object):
-    '''
+    """
     Dummy object
-    '''
+    """
+
     def __getattr__(self, name):
         return Dummy()
+
     def __call__(self, *args, **kwds):
         return Dummy()
+
     def __enter__(self):
         return Dummy()
+
     def __exit__(self, type, value, traceback):
         pass
+
     def __getitem__(self, i):
         return Dummy()
+
     def __setitem__(self, i, val):
         pass
 
 
 class CurrentDeviceProxy(object):
-    '''
+    """
     Method proxy for access to the currently active device
-    '''
+    """
+
     def __getattr__(self, name):
         if not hasattr(active_device, name):
-            if name.startswith('_'):
+            if name.startswith("_"):
                 # Do not fake private/magic attributes
-                raise AttributeError(('Active device does not have an '
-                                      'attribute %s') % name)
+                raise AttributeError(
+                    ("Active device does not have an " "attribute %s") % name
+                )
             else:
-                logger.warn(("Active device does not have an attribute '%s', "
-                             "ignoring this") % name)
+                logger.warn(
+                    ("Active device does not have an attribute '%s', " "ignoring this")
+                    % name
+                )
                 attr = Dummy()
         else:
             attr = getattr(active_device, name)
         return attr
+
 
 #: Proxy object to access methods of the current device
 device = CurrentDeviceProxy()
@@ -574,11 +642,12 @@ active_device = None
 
 
 def get_device():
-    '''
+    """
     Gets the actve `Device` object
-    '''
+    """
     global active_device
     return active_device
+
 
 #: A stack of previously set devices as a tuple with their options (see
 #: `set_device`): (device, build_on_run, build_options)
@@ -586,7 +655,7 @@ previous_devices = []
 
 
 def set_device(device, build_on_run=True, **kwargs):
-    '''
+    """
     Set the device used for simulations.
 
     Parameters
@@ -602,14 +671,12 @@ def set_device(device, build_on_run=True, **kwargs):
     kwargs : dict, optional
         Only relevant when ``build_on_run`` is ``True``: additional arguments
         that will be given to the `Device.build` call.
-    '''
+    """
     global previous_devices
     if active_device is not None:
-        prev_build_on_run = getattr(active_device, 'build_on_run', True)
-        prev_build_options = getattr(active_device, 'build_options', {})
-        previous_devices.append((active_device,
-                                 prev_build_on_run,
-                                 prev_build_options))
+        prev_build_on_run = getattr(active_device, "build_on_run", True)
+        prev_build_options = getattr(active_device, "build_options", {})
+        previous_devices.append((active_device, prev_build_on_run, prev_build_options))
     _do_set_device(device, build_on_run, **kwargs)
 
 
@@ -631,7 +698,7 @@ def _do_set_device(device, build_on_run=True, **kwargs):
 
 
 def reset_device(device=None):
-    '''
+    """
     Reset to a previously used device. Restores also the previously specified
     build options (see `set_device`) for the device. Mostly useful for internal
     Brian code and testing on various devices.
@@ -641,7 +708,7 @@ def reset_device(device=None):
     device : `Device` or str, optional
         The device to go back to. If none is specified, go back to the device
         chosen with `set_device` before the current one.
-    '''
+    """
     global previous_devices
     if isinstance(device, str):
         device = all_devices[device]
@@ -660,7 +727,7 @@ def reset_device(device=None):
 
 
 def reinit_devices():
-    '''
+    """
     Reinitialize all devices, call `Device.activate` again on the current
     device and reset the preferences. Used as a "teardown" function in testing,
     if users want to reset their device (e.g. for multiple standalone runs in a
@@ -671,7 +738,7 @@ def reinit_devices():
     -----
     This also resets the `defaultclock`, i.e. a non-standard ``dt`` has to be
     set again.
-    '''
+    """
     from brian2 import restore_initial_state  # avoids circular import
 
     for device in all_devices.values():
@@ -685,17 +752,17 @@ def reinit_devices():
 
 
 def reinit_and_delete():
-    '''
+    """
     Calls `reinit_devices` and additionally deletes the files left behind by
     the standalone mode in the temporary directory.
     Silently suppresses errors that occur while deleting the directory.
-    '''
+    """
     reinit_devices()
     device.delete(directory=True, force=True)
 
 
 def seed(seed=None):
-    '''
+    """
     Set the seed for the random number generator.
 
     Parameters
@@ -707,13 +774,11 @@ def seed(seed=None):
     Notes
     -----
     This function delegates the call to `Device.seed` of the current device.
-    '''
+    """
     if seed is not None and not isinstance(seed, numbers.Integral):
-        raise TypeError('Seed has to be None or an integer, was '
-                        '%s' % type(seed))
+        raise TypeError("Seed has to be None or an integer, was " "%s" % type(seed))
     get_device().seed(seed)
 
 
 runtime_device = RuntimeDevice()
-all_devices['runtime'] = runtime_device
-
+all_devices["runtime"] = runtime_device

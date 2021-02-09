@@ -408,18 +408,20 @@ class JaxConstant(Variable):
         else:
             dtype = get_dtype(value)
 
+        print("Trying to cast")
+
         # Use standard Python types if possible for numpy scalars
         if getattr(value, "shape", None) == () and hasattr(value, "dtype"):
             numpy_type = value.dtype
-            if np.can_cast(numpy_type, np.int_):
+            if jnp.can_cast(numpy_type, jnp.int_):
                 value = int(value)
-            elif np.can_cast(numpy_type, np.float_):
-                value = float(value)
-            elif np.can_cast(numpy_type, np.complex_):
+            elif jnp.can_cast(numpy_type, jnp.float_):
+                value = float(value)  # cast from values with units to float.
+            elif jnp.can_cast(numpy_type, jnp.complex_):
                 value = complex(value)
-            elif value is np.True_:
+            elif value is jnp.True_:
                 value = True
-            elif value is np.False_:
+            elif value is jnp.False_:
                 value = False
 
         #: The constant's value

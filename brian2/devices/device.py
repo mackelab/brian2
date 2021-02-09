@@ -301,7 +301,9 @@ class Device(object):
         if compiler_kwds is None:
             compiler_kwds = {}
         name = find_name(name)
+        print("codeobj_class beoof", codeobj_class)
         codeobj_class = self.code_object_class(codeobj_class)
+        print("codeobj_class", codeobj_class)
         template = getattr(codeobj_class.templater, template_name)
         iterate_all = template.iterate_all
         generator = codeobj_class.generator_class(

@@ -37,6 +37,7 @@ from brian2.core.namespace import (
 from brian2.codegen.codeobject import create_runner_codeobj
 from brian2.equations.equations import BOOLEAN, INTEGER, FLOAT, Equations
 from brian2.units.fundamentalunits import (
+    Quantity,
     fail_for_dimension_mismatch,
     get_unit,
     DIMENSIONLESS,
@@ -745,9 +746,11 @@ class Group(VariableOwner, BrianObject):
         KeyError
             If the `identifier` could not be resolved
         """
-        print("Resolving...")
         if identifier == "g_na":
             value = run_namespace[identifier]
+            # identifier is the name ==> "g_na"
+            # dimension is the unit ==> m^-2 kg^-1 s^3 A^2
+            # value is a `Quantity` (see fundatmentaluntis.py). It's a value with unit.
             dimensions = getattr(value, "dim", DIMENSIONLESS)
             resolved = JaxConstant(identifier, dimensions=dimensions, value=value)
             return resolved

@@ -1017,9 +1017,7 @@ class Network(Nameable):
         for obj in all_objects:
             if obj.active:
                 try:
-                    print("Starting")
                     obj.before_run(run_namespace)
-                    print("one", obj)
                 except Exception as ex:
                     raise BrianObjectException(
                         "An error occurred when preparing an object.", obj
@@ -1159,7 +1157,6 @@ class Network(Nameable):
             namespace = get_local_namespace(level=level + 3)
 
         self.before_run(namespace)
-        print("===================Done with before_run")
 
         if len(all_objects) == 0:
             return  # TODO: raise an error? warning?

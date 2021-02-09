@@ -20,6 +20,7 @@ from brian2.core.preferences import prefs
 from brian2.core.variables import (
     Variables,
     Constant,
+    JaxConstant,
     Variable,
     ArrayVariable,
     DynamicArrayVariable,
@@ -743,10 +744,11 @@ class Group(VariableOwner, BrianObject):
         KeyError
             If the `identifier` could not be resolved
         """
+        print("Resolving...")
         if identifier == "g_na":
             value = run_namespace[identifier]
             dimensions = getattr(value, "dim", DIMENSIONLESS)
-            resolved = Constant(identifier, dimensions=dimensions, value=value)
+            resolved = JaxConstant(identifier, dimensions=dimensions, value=value)
             return resolved
         else:
 

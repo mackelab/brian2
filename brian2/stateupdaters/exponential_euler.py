@@ -82,7 +82,6 @@ class ExponentialEulerStateUpdater(StateUpdateMethod):
     """
 
     def __call__(self, equations, variables=None, method_options=None):
-        print("Call state updated")
         extract_method_options(method_options, {})
         if equations.is_stochastic:
             raise UnsupportedEquationsException(

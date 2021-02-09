@@ -8,6 +8,7 @@ import functools
 import numbers
 
 import numpy as np
+import jax.numpy as jnp
 
 from brian2.units.fundamentalunits import (
     Quantity,
@@ -349,7 +350,6 @@ class Constant(Variable):
             if np.can_cast(numpy_type, np.int_):
                 value = int(value)
             elif np.can_cast(numpy_type, np.float_):
-                print("value", value)
                 value = float(value)
             elif np.can_cast(numpy_type, np.complex_):
                 value = complex(value)
@@ -362,6 +362,70 @@ class Constant(Variable):
         self.value = value
 
         super(Constant, self).__init__(
+            dimensions=dimensions,
+            name=name,
+            owner=owner,
+            dtype=dtype,
+            scalar=True,
+            constant=True,
+            read_only=True,
+        )
+
+    def get_value(self):
+        return self.value
+
+
+class JaxConstant(Variable):
+    """
+    A scalar constant in jax (e.g. the number of neurons ``N``). Information such as
+    the dtype or whether this variable is a boolean are directly derived from
+    the `value`. Most of the time `Variables.add_constant` should be used
+    instead of instantiating this class directly.
+
+    Parameters
+    ----------
+    name : str
+        The name of the variable
+    dimensions : `Dimension`, optional
+        The physical dimensions of the variable. Note that the variable itself
+        (as referenced by value) should never have units attached.
+    value: reference to the variable value
+        The value of the constant.
+    owner : `Nameable`, optional
+        The object that "owns" this variable, for constants that belong to a
+        specific group, e.g. the ``N`` constant for a `NeuronGroup`. External
+        constants will have ``None`` (the default value).
+    """
+
+    def __init__(self, name, value, dimensions=DIMENSIONLESS, owner=None):
+        # Determine the type of the value
+        is_bool = (
+            value is True or value is False or value is np.True_ or value is np.False_
+        )
+
+        if is_bool:
+            dtype = np.bool
+        else:
+            dtype = get_dtype(value)
+
+        # Use standard Python types if possible for numpy scalars
+        if getattr(value, "shape", None) == () and hasattr(value, "dtype"):
+            numpy_type = value.dtype
+            if np.can_cast(numpy_type, np.int_):
+                value = int(value)
+            elif np.can_cast(numpy_type, np.float_):
+                value = float(value)
+            elif np.can_cast(numpy_type, np.complex_):
+                value = complex(value)
+            elif value is np.True_:
+                value = True
+            elif value is np.False_:
+                value = False
+
+        #: The constant's value
+        self.value = value
+
+        super(JaxConstant, self).__init__(
             dimensions=dimensions,
             name=name,
             owner=owner,

@@ -175,7 +175,6 @@ class StateUpdateMethod(object, metaclass=ABCMeta):
         abstract_code : str
             The code integrating the given equations.
         """
-        print("C")
         if isinstance(method, Iterable) and not isinstance(method, str):
             the_method = None
             start_time = time.time()
